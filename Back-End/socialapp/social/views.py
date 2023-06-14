@@ -10,22 +10,30 @@ from django.contrib.auth.models import User
 import requests
 from .tasks import enrich_user
 from rest_framework.decorators import action
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+EMAIL_API_KEY = os.getenv("EMAIL_API_KEY")
 class UserSignup(APIView):
     def post(self, request):
         # Extract email from POST data
+        print(request)
         email = request.data.get('email')
-
+        print(email)
+        if User.objects.filter(username=email).exists():
+            return Response({'detail': 'User with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
         # Send GET request to AbstractAPI's Email Validation API
-        response = requests.get(f'https://emailvalidation.abstractapi.com/v1/?api_key=YOUR_API_KEY&email={email}')
-
+        response = requests.get(f'https://emailvalidation.abstractapi.com/v1/?api_key={EMAIL_API_KEY}&email={email}')
+        print(response.json())
         # Extract the is_valid field from the response
-        is_valid = response.json().get('is_valid')
+        is_smtp_valid = response.json().get('is_smtp_valid')
 
         # If the email is not valid, return a 400 status code
-        if not is_valid:
+        if not is_smtp_valid:
             return Response({'detail': 'Invalid email.'}, status=status.HTTP_400_BAD_REQUEST)
-
+        print("email:",email)
         # Otherwise, create the User and UserProfile
         user = User.objects.create_user(username=email, email=email, password=request.data.get('password'))
         UserProfile.objects.create(user=user)
